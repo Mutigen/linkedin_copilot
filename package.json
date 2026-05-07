@@ -1,0 +1,19 @@
+{
+  "name": "linkedin-copilot",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "server": "node server.js",
+    "linkedin:ui": "node server.js --open",
+    "linkedin:copilot": "node linkedin-copilot.js",
+    "comments": "node run-from-file.js",
+    "vercel:dev": "vercel dev"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

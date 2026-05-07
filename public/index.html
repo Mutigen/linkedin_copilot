@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#020712" />
+    <title>MUT-i-GEN LinkedIn Copilot</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="app-panel">
+        <header class="hero">
+          <p class="eyebrow">MUT-i-GEN</p>
+          <h1>LinkedIn Copilot</h1>
+          <p class="subline">Minimaler Browser-Workflow statt CLI oder n8n.</p>
+        </header>
+
+        <section class="mode-switch" aria-label="Aktion wählen">
+          <button class="mode-chip active" data-mode="comment" type="button">Kommentar</button>
+          <button class="mode-chip" data-mode="dm" type="button">DM-Vorlage</button>
+        </section>
+
+        <section class="todo-card" aria-label="LinkedIn Tagesplan">
+          <div class="todo-card-header">
+            <div>
+              <p class="todo-eyebrow">LinkedIn Strategie</p>
+              <h2>Heute</h2>
+            </div>
+            <p id="todoDate" class="todo-date"></p>
+          </div>
+
+          <div id="todoList" class="todo-list"></div>
+        </section>
+
+        <section id="chat" class="chat-log" aria-live="polite"></section>
+
+        <form id="composer" class="composer">
+          <div class="field-group">
+            <label for="mainInput" id="mainLabel">LinkedIn-Beitrag einfügen</label>
+            <textarea id="mainInput" name="mainInput" rows="10" placeholder="Hier den fremden LinkedIn-Post einfügen ..." required></textarea>
+          </div>
+
+          <div id="dmFields" class="dm-fields hidden">
+            <div class="inline-fields">
+              <div class="field-group">
+                <label for="profileInput">Profilname optional</label>
+                <input id="profileInput" name="profileInput" type="text" placeholder="z. B. Max Mustermann" />
+              </div>
+              <div class="field-group">
+                <label for="stageInput">Stage</label>
+                <select id="stageInput" name="stageInput">
+                  <option value="Stufe 1">Stufe 1</option>
+                  <option value="Stufe 2">Stufe 2</option>
+                  <option value="Stufe 3">Stufe 3</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="inline-fields">
+              <div class="field-group">
+                <label for="topicInput">Post-Thema optional</label>
+                <input id="topicInput" name="topicInput" type="text" placeholder="z. B. Fundraising, Positionierung" />
+              </div>
+              <div class="field-group">
+                <label for="triggerInput">Trigger optional</label>
+                <input id="triggerInput" name="triggerInput" type="text" placeholder="z. B. Kommentar auf meinen Post" />
+              </div>
+            </div>
+          </div>
+
+          <div class="composer-actions">
+            <p id="helperText" class="helper-text">Post rein, Klick auf Senden, Kommentar zurück.</p>
+            <button id="submitButton" class="submit-button" type="submit">Senden</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <p class="message-role"></p>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

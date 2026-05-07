@@ -1,0 +1,360 @@
+:root {
+  --bg: #020712;
+  --panel: rgba(10, 31, 68, 0.68);
+  --panel-border: rgba(0, 255, 247, 0.16);
+  --text: #f3f8fb;
+  --muted: rgba(243, 248, 251, 0.68);
+  --accent: #00fff7;
+  --accent-strong: #5ff9f0;
+  --user: rgba(0, 255, 247, 0.08);
+  --assistant: rgba(255, 255, 255, 0.05);
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(0, 255, 247, 0.1), transparent 24%),
+    radial-gradient(circle at top right, rgba(60, 110, 113, 0.14), transparent 28%),
+    linear-gradient(180deg, #06121e 0%, var(--bg) 100%);
+  color: var(--text);
+  font-family: "Open Sans", "Helvetica Neue", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app-shell {
+  width: min(920px, calc(100vw - 32px));
+  margin: 32px auto;
+}
+
+.app-panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+
+.hero {
+  padding: 28px 28px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: rgba(0, 255, 247, 0.74);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1;
+}
+
+.subline {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+.mode-switch {
+  display: flex;
+  gap: 10px;
+  padding: 20px 28px 0;
+}
+
+.mode-chip {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.mode-chip.active {
+  border-color: rgba(0, 255, 247, 0.5);
+  background: rgba(0, 255, 247, 0.12);
+}
+
+.todo-card {
+  margin: 20px 28px 0;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.todo-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.todo-eyebrow {
+  margin: 0 0 6px;
+  color: rgba(0, 255, 247, 0.72);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.todo-card h2 {
+  margin: 0;
+  font-family: "Montserrat", "Helvetica Neue", sans-serif;
+  font-size: 22px;
+}
+
+.todo-date {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(1, 9, 18, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.todo-check {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+}
+
+.todo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.todo-title {
+  font-weight: 700;
+}
+
+.todo-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.todo-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-counter button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: var(--text);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.todo-count {
+  min-width: 48px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.todo-item.done {
+  border-color: rgba(0, 255, 247, 0.24);
+  background: rgba(0, 255, 247, 0.06);
+}
+
+.chat-log {
+  min-height: 280px;
+  max-height: 48vh;
+  overflow-y: auto;
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.message {
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.message.user {
+  background: var(--user);
+}
+
+.message.assistant,
+.message.system {
+  background: var(--assistant);
+}
+
+.message-role {
+  margin: 0 0 8px;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.message-body {
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
+
+.message-body strong {
+  color: var(--text);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 28px 28px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-group label {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+textarea,
+input,
+select {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(1, 9, 18, 0.7);
+  color: var(--text);
+  padding: 14px 16px;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 220px;
+}
+
+.inline-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dm-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hidden {
+  display: none;
+}
+
+.composer-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.helper-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+.submit-button {
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #001217;
+  padding: 14px 22px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 50px;
+}
+
+.mode-chip:focus-visible,
+.submit-button:focus-visible,
+.todo-counter button:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(0, 255, 247, 0.85);
+  outline-offset: 2px;
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: calc(100vw - 20px);
+    margin: 10px auto;
+  }
+
+  .hero,
+  .mode-switch,
+  .todo-card,
+  .chat-log,
+  .composer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .todo-card {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .todo-item {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-counter {
+    justify-content: flex-start;
+  }
+
+  .inline-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .composer-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
