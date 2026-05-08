@@ -1362,6 +1362,46 @@ function compactSnippet(text, maxLength = 220) {
     .replace(/\s+\S*$/, '');
 }
 
+function extractOfferOneLiner(strategyText) {
+  const match = String(strategyText || '').match(/"Ich übersetze technische Startup-Ideen[^"]+"/i);
+  return match ? match[0].replace(/^"|"$/g, '') : 'Ich übersetze technische Startup-Ideen in Investor-Sprache — Website, Pitch, Positionierung — damit der nächste Investor-Call nicht an Kommunikation scheitert.';
+}
+
+function buildCommentVoiceGuide(strategyText) {
+  return [
+    'MUT-i-GEN LinkedIn Voice Guide fuer Kommentare und Verbindungsnachrichten',
+    '',
+    `Offer-Kern: ${extractOfferOneLiner(strategyText)}`,
+    'ICP: Tech-Startup-Gruender in DACH, Pre-Seed bis Seed. Sie haben oft eine starke Idee, aber noch keine klare Sprache, kein digitales Fundament und zu wenig Vertrauen im ersten Investor-/Kundenkontakt.',
+    'Kernschmerz: Nicht die Idee scheitert zuerst, sondern die Uebersetzung: Website, Pitch, Positionierung, Story, Vertrauen.',
+    '',
+    'Stimme: Deutsch, du-Form, ehrlich, direkt, ruhig, Founder-zu-Founder. Kein Marketing-Sound. Kein generisches Lob. Keine Emoji. Keine Links.',
+    'Kommentar-Ziel: am konkreten Post andocken, einen Gedanken schaerfen, eine Spannung sichtbar machen oder eine echte Folgefrage stellen.',
+    'Kommentar-Regeln: ein Absatz, 180 bis 420 Zeichen, maximal ein Fragezeichen. Kein Pitch, kein Angebot, kein Hinweis auf mutigen.de.',
+    'Erlaubte Moves: spezifischen Punkt spiegeln, Kontrast herausarbeiten, blinden Fleck benennen, ruhige Folgefrage stellen.',
+    'Nicht behaupten: dass Levan diese Situation selbst erlebt hat, mit solchen Kunden arbeitet oder das staendig sieht. Keine erfundenen Ich-/Wir-Geschichten.',
+    '',
+    'Verbindungsnachricht: nur wenn natuerlich. Konkreten Post referenzieren, kurz sagen warum der Punkt haengen bleibt, Einladung zum Vernetzen. Kein Angebot, kein Service-Pitch.',
+  ].join('\n');
+}
+
+function buildDmVoiceGuide(strategyText) {
+  return [
+    'MUT-i-GEN LinkedIn Voice Guide fuer DMs',
+    '',
+    `Offer-Kern: ${extractOfferOneLiner(strategyText)}`,
+    'ICP: Tech-Startup-Gruender in DACH, Pre-Seed bis Seed. Fokus: Investor-Sprache, Website, Pitch, Positionierung, digitales Fundament, Vertrauen.',
+    'Stimme: Deutsch, du-Form, ehrlich, direkt, ruhig, Founder-zu-Founder. Kein Marketing-Sound. Keine Emoji. Keine Links.',
+    '',
+    'DM-Prinzip: warmes Signal ernst nehmen, konkret auf den Punkt reagieren, eine echte Rueckfrage stellen.',
+    'Like oder Kommentar: bedanken, konkreten Punkt spiegeln, fragen wo die Person gerade damit steht. Kein Pitch.',
+    'Antwort im DM-Thread: auf die Antwort eingehen, Vertrauen aufbauen, wieder konkret fragen. Kein Pitch, solange kein Interesse/Bedarf signalisiert wurde.',
+    'Interesse oder konkrete Nachfrage: kurz und ruhig sagen, wobei Levan helfen kann, aber nur wenn das Signal wirklich danach klingt.',
+    'Nicht behaupten: dass Levan dieselbe Situation gerade hat, mit solchen Kunden arbeitet oder eine Beziehung besteht, die nicht genannt wurde.',
+    'Maximal 500 Zeichen. Ein kurzer Absatz. Hoechstens eine konkrete Rueckfrage am Ende.',
+  ].join('\n');
+}
+
 function snippetAroundTerms(text, terms, maxLength = 220) {
   const compact = String(text || '').replace(/\s+/g, ' ').trim();
   if (!compact) return '';
@@ -1505,7 +1545,7 @@ async function callAnthropicCommentAgent({ draft, opportunity, config, strategyT
     rawPostText: compactSnippet(opportunity.rawPostText, 5000),
     existingFallbackComment: draft.text,
     existingFallbackConnection: draft.connectionText || '',
-    mutigenStrategy: compactSnippet(strategyText, 4500),
+    mutigenVoiceGuide: buildCommentVoiceGuide(strategyText),
   };
 
   try {
@@ -1825,7 +1865,7 @@ async function callAnthropicDmAgent({ draft, signal, config, strategyText }) {
     userPoint: signal.userPoint || draft.userPoint || '',
     signalText: signal.signalText || draft.signalText || signal.trigger || signal.reactionType || '',
     fallbackDm: draft.text,
-    mutigenStrategy: compactSnippet(strategyText, 3500),
+    mutigenVoiceGuide: buildDmVoiceGuide(strategyText),
   };
 
   try {
@@ -1970,7 +2010,7 @@ function makeDmDrafts(warmSignals) {
   if (warmSignals.length === 0) return [];
 
   return warmSignals.map((signal) => ({
-    stage: signal.stage || 'Stufe 1',
+    stage: signal.stage || 'Like oder Kommentar auf meinen Post',
     trigger: signal.trigger || signal.reactionType || 'Warme Reaktion',
     profile: signal.name || signal.profile || '',
     postTopic: signal.postTopic || '',
@@ -1984,17 +2024,17 @@ function makeDmDrafts(warmSignals) {
 function makeDmTemplates() {
   return [
     {
-      stage: 'Stufe 1',
+      stage: 'Like oder Kommentar auf meinen Post',
       trigger: 'Like oder Kommentar auf deinen Post',
       text: 'Danke für deine Reaktion auf meinen Post zu [Post-Thema]. Was du geschrieben hast über [ihr Punkt] — das kenne ich gut. Wo stehst du gerade damit konkret?',
     },
     {
-      stage: 'Stufe 2',
-      trigger: 'Antwort auf Stufe 1',
+      stage: 'Antwort im DM-Thread',
+      trigger: 'Antwort auf deine erste DM',
       text: 'Verstehe. Gerade dieser Punkt ist bei vielen frühen Gründern der Moment, wo aus einer guten Idee noch kein klares Fundament wird. Was ist im Moment der konkrete Engpass: Website, Pitch oder Positionierung?',
     },
     {
-      stage: 'Stufe 3',
+      stage: 'Interesse oder konkrete Nachfrage',
       trigger: 'Interesse oder klare Bedarfssignale',
       text: 'Wenn du gerade aufbaust und das hier etwas ausgelöst hat, erzähl mir kurz, wo du stehst. Ich schau mir an, ob ich helfen kann.',
     },

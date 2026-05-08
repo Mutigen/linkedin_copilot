@@ -79,6 +79,7 @@ async function run() {
     trigger: 'Kommentar auf meinen Post',
   });
   assert.equal(dmResult.ok, true);
+  assert.equal(dmResult.primaryDm.stage, 'Like oder Kommentar auf meinen Post');
   assert.match(dmResult.primaryDm.text, /Danke|angedockt|konkret/);
 }
 
