@@ -25,6 +25,35 @@ Some heroes don't wear capes. Mothers don't but they are our heroes.
 
 const investorLanguagePost = `Wir haben unsere Seed-Runde vorbereitet und gemerkt: Das Pitch Deck war nicht das Problem. Die Investoren haben verstanden, was wir bauen, aber nicht warum genau jetzt der Markt kippt. Seit wir die Story auf Timing, Risiko und Traction geschärft haben, sind die Gespräche viel konkreter geworden.`;
 
+const founderLearningPost = `Profil von Jan Goslicki anzeigen
+Jan Goslicki
+
+  • 3.+
+
+Serial Crypto Entrepreneur & Executive | COO & Co-Founder | Driving Innovation in Fintech and Blockchain
+
+Zur Website
+
+2 Woche(n) •
+
+Folgen
+
+The worst advice I ever received: "Focus on growth. Growth solves everything."
+
+It doesn't.
+
+Growth without sustainability is a bonfire. Impressive for 5 minutes. Then ashes.
+
+As a founder, your job is not to impress investors with big numbers. Your job is to solve problems for your customers.
+
+Help them make money. Help them survive. Help them get things done.
+
+Vanity metrics look great in a pitch deck. They mean nothing in a bank account.
+
+If you solve real problems, money follows. If you chase growth, you chase your own tail.
+
+I made that mistake. I won't make it again.`;
+
 async function run() {
   const personalResult = await generateCommentFromBody({ postText: personalHashtagPost });
   assert.equal(personalResult.ok, false);
@@ -35,6 +64,11 @@ async function run() {
   assert.equal(investorResult.ok, true);
   assert.equal(investorResult.primaryComment.topic, 'Investor-Sprache');
   assert.match(investorResult.primaryComment.text, /Investorengesprächen|Funding-Gesprächen|Fundraising/);
+
+  const founderLearningResult = await generateCommentFromBody({ postText: founderLearningPost });
+  assert.equal(founderLearningResult.ok, true);
+  assert.equal(founderLearningResult.primaryComment.topic, 'Founder-Realität');
+  assert.match(founderLearningResult.primaryComment.why, /Founder-Story|Startup/);
 }
 
 run().catch((error) => {

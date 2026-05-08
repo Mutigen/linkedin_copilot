@@ -236,18 +236,28 @@ const POST_FOUNDER_STORY_TERMS = [
   'founder journey',
   'gründerreise',
   'gründer journey',
+  'worst advice',
   'aufbau',
   'bauen',
   'building in public',
   'build in public',
   'fehler',
+  'mistake',
+  'mistakes',
   'rückschlag',
   'ruckschlag',
   'wendepunkt',
   'gelernt',
   'lesson learned',
+  'advice',
   'scheitern',
   'gescheitert',
+  'growth',
+  'sustainability',
+  'vanity metrics',
+  'solve problems',
+  'customers',
+  'bank account',
   'cashflow',
   'runway',
   'bootstrapped',
@@ -278,6 +288,15 @@ const GENERIC_INVESTOR_TERMS = new Set(['investor', 'investoren', 'vc', 'angel']
 const BUSINESS_SPECIFIC_FOUNDER_STORY_TERMS = new Set([
   'building in public',
   'build in public',
+  'worst advice',
+  'mistake',
+  'mistakes',
+  'growth',
+  'sustainability',
+  'vanity metrics',
+  'solve problems',
+  'customers',
+  'bank account',
   'cashflow',
   'runway',
   'bootstrapped',
@@ -1033,9 +1052,16 @@ function stripLeadingLinkedInHeader(text, name = '') {
   return compact;
 }
 
-function parseRecentFeedPosts(rawPosts, maxPosts, name = '') {
+function parseRecentFeedPosts(rawPosts, maxPosts, name = '', options = {}) {
   const source = Array.isArray(rawPosts) ? rawPosts.join('\n\n') : String(rawPosts || '');
   if (!source.trim()) return [];
+
+  if (options.singlePost) {
+    const text = stripLeadingLinkedInHeader(cleanPostText(source, name), name);
+    return text.length >= 80
+      ? [{ feedIndex: 1, rawText: source.trim(), text }]
+      : [];
+  }
 
   const posts = [];
   const markerRegex = /Nummer des Feedbeitrags\s+(\d+)([\s\S]*?)(?=Nummer des Feedbeitrags\s+\d+|$)/gi;
@@ -1166,7 +1192,12 @@ function buildOpportunities(profiles, config) {
     const profileScore = profile.source === 'manual_post'
       ? { score: 0, reasons: [], matchedTerms: [] }
       : scoreText(profileText);
-    const recentPosts = parseRecentFeedPosts(profile.profile?.sections?.posts || '', config.maxRecentPosts, name);
+    const recentPosts = parseRecentFeedPosts(
+      profile.profile?.sections?.posts || '',
+      config.maxRecentPosts,
+      name,
+      { singlePost: profile.source === 'manual_post' }
+    );
 
     if (recentPosts.length === 0) {
       excludedProfiles.push({
@@ -1233,12 +1264,18 @@ function buildOpportunities(profiles, config) {
 
 function inferTopic(opportunity) {
   const postRelevance = opportunity.postRelevance || {};
+  const directTerms = (postRelevance.directMatchedTerms || []).join(' ');
+  const founderStoryTerms = (postRelevance.founderStoryMatchedTerms || []).join(' ');
   const terms = [
     ...(postRelevance.directMatchedTerms || []),
     ...(postRelevance.founderStoryMatchedTerms || []),
     ...(postRelevance.contextMatchedTerms || []),
   ].join(' ');
 
+  if (/worst advice|mistake|fehler|rückschlag|ruckschlag|scheitern|gescheitert|vanity metrics|growth|sustainability|solve problems|customers|bank account/.test(founderStoryTerms)
+    && !/funding|fundraising|pre-seed|pre seed|seed/.test(directTerms)) {
+    return 'Founder-Realität';
+  }
   if (/funding|fundraising|investor|vc|angel|pitch|pre-seed|pre seed|seed/.test(terms)) return 'Investor-Sprache';
   if (/fehler|rückschlag|ruckschlag|scheitern|gescheitert|cashflow|runway|lesson learned|gelernt|wendepunkt/.test(terms)) return 'Founder-Realität';
   if (/aufbau|bauen|building in public|build in public|launch|erste kunden|erster kunde|traction|pivot/.test(terms)) return 'frühen Aufbau';
