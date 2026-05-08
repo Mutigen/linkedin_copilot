@@ -11,6 +11,7 @@
     "linkedin:ui": "node server.js --open",
     "linkedin:copilot": "node linkedin-copilot.js",
     "comments": "node run-from-file.js",
+    "test": "node tests/relevance.test.js",
     "vercel:dev": "vercel dev"
   },
   "dependencies": {

@@ -275,6 +275,43 @@ const POST_ECOSYSTEM_ONLY_TERMS = [
 
 const GENERIC_INVESTOR_TERMS = new Set(['investor', 'investoren', 'vc', 'angel']);
 
+const BUSINESS_SPECIFIC_FOUNDER_STORY_TERMS = new Set([
+  'building in public',
+  'build in public',
+  'cashflow',
+  'runway',
+  'bootstrapped',
+  'pivot',
+  'launch',
+  'erste kunden',
+  'erster kunde',
+  'erste nutzer',
+  'traction',
+  'product-market-fit',
+  'product market fit',
+]);
+
+const PERSONAL_ONLY_TERMS = [
+  'mother',
+  'mutter',
+  'father',
+  'vater',
+  'family',
+  'familie',
+  'grandmother',
+  'grandfather',
+  'diagnosed',
+  'diagnose',
+  'wheelchair',
+  'rollstuhl',
+  'marathon',
+  'pilates',
+  'hero',
+  'heroes',
+  'held',
+  'heldin',
+];
+
 function log(message) {
   process.stderr.write(`[linkedin-copilot] ${message}\n`);
 }
@@ -461,6 +498,19 @@ function containsStandaloneTerm(normalizedText, term) {
 function matchStandaloneTerms(text, terms) {
   const normalized = normalizeText(text);
   return terms.filter((term) => containsStandaloneTerm(normalized, term));
+}
+
+function stripHashtags(text) {
+  return String(text || '')
+    .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractHashtagText(text) {
+  return (String(text || '').match(/#[\p{L}\p{N}_-]+/gu) || [])
+    .map((tag) => tag.slice(1).replace(/[-_]+/g, ' '))
+    .join(' ');
 }
 
 function canonicalProfileKey({ username, url, name }) {
@@ -779,6 +829,14 @@ function classifyProfile(profile, config) {
     };
   }
 
+  if (profile.source === 'manual_post') {
+    return {
+      category: 'manual_post',
+      target: true,
+      reason: 'Manuell eingefügter Post; Relevanz wird am Beitrag geprüft',
+    };
+  }
+
   const activeFounderMatches = matchTerms(text, ACTIVE_FOUNDER_TERMS);
   const techMatches = matchTerms(text, TECH_STARTUP_TERMS);
   const fundraisingMatches = matchTerms(text, FUNDRAISING_TERMS);
@@ -884,7 +942,8 @@ function isLikelyPostHeaderLine(line, name) {
   const normalizedName = normalizeText(name);
   return (
     (normalizedName && normalizedLine === normalizedName) ||
-    /\b(Premium|Verifiziert|Follower:innen|Kontaktinfo|Nachricht|Vernetzen|Folgen)\b/i.test(line) ||
+    /\b(Premium|Verifiziert|Follower:innen|Follower:in|Kontaktinfo|Nachricht|Vernetzen|Folgen)\b/i.test(line) ||
+    /^\d+\s*(Sekunde|Sekunden|Minute|Minuten|Stunde|Stunden|Tag|Tage|Woche|Wochen|Monat|Monate|Jahr|Jahre)\(n\)?\s*•?$/i.test(line) ||
     /(^|\s)•\s*[123]\.?\+/.test(line) ||
     /\b(Founder|CEO|CTO|Geschäftsführer|Gründer)\b.*(@|\|)/i.test(line)
   );
@@ -905,6 +964,13 @@ function cleanPostText(rawText, name = '') {
     .filter((line) => !isLinkedInUiLine(line));
 
   let startIndex = 0;
+  const linkedinDateIndex = lines
+    .slice(0, 8)
+    .findIndex((line) => /^\d+\s*(Sekunde|Sekunden|Minute|Minuten|Stunde|Stunden|Tag|Tage|Woche|Wochen|Monat|Monate|Jahr|Jahre)\(n\)?\s*•?$/i.test(line));
+  if (linkedinDateIndex >= 0) {
+    startIndex = linkedinDateIndex + 1;
+  }
+
   while (startIndex < lines.length && startIndex < 8 && isLikelyPostHeaderLine(lines[startIndex], name)) {
     startIndex += 1;
   }
@@ -996,20 +1062,42 @@ function parseRecentFeedPosts(rawPosts, maxPosts, name = '') {
 }
 
 function scoreRecentPostRelevance(postText) {
-  const directMatches = matchStandaloneTerms(postText, POST_DIRECT_RELEVANCE_TERMS);
-  const strategyMatches = matchTerms(postText, POST_STRATEGY_RELEVANCE_TERMS);
-  const startupMatches = matchTerms(postText, POST_STARTUP_CONTEXT_TERMS);
-  const founderStoryMatches = matchTerms(postText, POST_FOUNDER_STORY_TERMS);
-  const ecosystemOnlyMatches = matchTerms(postText, POST_ECOSYSTEM_ONLY_TERMS);
+  const textWithoutHashtags = stripHashtags(postText);
+  const hashtagText = extractHashtagText(postText);
+  const directMatches = matchStandaloneTerms(textWithoutHashtags, POST_DIRECT_RELEVANCE_TERMS);
+  const strategyMatches = matchTerms(textWithoutHashtags, POST_STRATEGY_RELEVANCE_TERMS);
+  const startupMatches = matchTerms(textWithoutHashtags, POST_STARTUP_CONTEXT_TERMS);
+  const founderStoryMatches = matchTerms(textWithoutHashtags, POST_FOUNDER_STORY_TERMS);
+  const ecosystemOnlyMatches = matchTerms(textWithoutHashtags, POST_ECOSYSTEM_ONLY_TERMS);
+  const hashtagOnlyMatches = matchStandaloneTerms(hashtagText, POST_DIRECT_RELEVANCE_TERMS);
+  const personalOnlyMatches = matchTerms(textWithoutHashtags, PERSONAL_ONLY_TERMS);
+  const businessSpecificFounderStoryMatches = founderStoryMatches.filter((term) => (
+    BUSINESS_SPECIFIC_FOUNDER_STORY_TERMS.has(normalizeText(term))
+  ));
+  const genericFounderStoryMatches = founderStoryMatches.filter((term) => (
+    !BUSINESS_SPECIFIC_FOUNDER_STORY_TERMS.has(normalizeText(term))
+  ));
   const hasOnlyGenericInvestorSignal = directMatches.length > 0
     && directMatches.every((term) => GENERIC_INVESTOR_TERMS.has(normalizeText(term)));
   const hasStrongDirectSignal = directMatches.length > 0 && !hasOnlyGenericInvestorSignal;
   const hasGenericInvestorWithFounderContext = hasOnlyGenericInvestorSignal
     && (startupMatches.length > 0 || founderStoryMatches.length > 0)
     && ecosystemOnlyMatches.length === 0;
-  const hasFounderStorySignal = founderStoryMatches.length > 0;
+  const hasFounderStorySignal = businessSpecificFounderStoryMatches.length > 0
+    || (genericFounderStoryMatches.length > 0 && (startupMatches.length > 0 || strategyMatches.length > 0 || directMatches.length > 0));
   const hasStrategyStartupSignal = strategyMatches.length > 0 && startupMatches.length > 0;
-  const relevant = hasStrongDirectSignal || hasGenericInvestorWithFounderContext || hasFounderStorySignal || hasStrategyStartupSignal;
+  const hasOnlyHashtagBusinessSignals = directMatches.length === 0
+    && strategyMatches.length === 0
+    && startupMatches.length === 0
+    && founderStoryMatches.length === 0
+    && hashtagOnlyMatches.length > 0;
+  const isPersonalOnlyPost = personalOnlyMatches.length > 0
+    && directMatches.length === 0
+    && strategyMatches.length === 0
+    && businessSpecificFounderStoryMatches.length === 0;
+  const relevant = !hasOnlyHashtagBusinessSignals
+    && !isPersonalOnlyPost
+    && (hasStrongDirectSignal || hasGenericInvestorWithFounderContext || hasFounderStorySignal || hasStrategyStartupSignal);
 
   if (!relevant) {
     return {
@@ -1020,6 +1108,7 @@ function scoreRecentPostRelevance(postText) {
       directMatchedTerms: [],
       contextMatchedTerms: [],
       founderStoryMatchedTerms: [],
+      hashtagOnlyMatchedTerms: [...new Set(hashtagOnlyMatches)],
     };
   }
 
@@ -1037,6 +1126,7 @@ function scoreRecentPostRelevance(postText) {
     directMatchedTerms: [...new Set(directMatches)],
     contextMatchedTerms: [...new Set([...strategyMatches, ...startupMatches])],
     founderStoryMatchedTerms: [...new Set(founderStoryMatches)],
+    hashtagOnlyMatchedTerms: [...new Set(hashtagOnlyMatches)],
   };
 }
 
@@ -1073,7 +1163,9 @@ function buildOpportunities(profiles, config) {
     }
 
     const profileText = profileCoreSections(profile);
-    const profileScore = scoreText(profileText);
+    const profileScore = profile.source === 'manual_post'
+      ? { score: 0, reasons: [], matchedTerms: [] }
+      : scoreText(profileText);
     const recentPosts = parseRecentFeedPosts(profile.profile?.sections?.posts || '', config.maxRecentPosts, name);
 
     if (recentPosts.length === 0) {
@@ -1155,6 +1247,14 @@ function inferTopic(opportunity) {
 }
 
 function commentVariantsForTopic(topic) {
+  if (topic === 'Investor-Sprache') {
+    return [
+      'Das ist ein wichtiger Punkt bei Investorengesprächen: Oft hängt es nicht daran, ob das Produkt gut ist, sondern ob Markt, Timing und Risiko schnell verständlich werden. Welche Stelle im Pitch hat bei euch am meisten Klarheit gebracht?',
+      'Bei Funding-Gesprächen wird Klarheit schnell zum Hebel. Nicht mehr Buzzwords, sondern eine sauberere Verbindung aus Problem, Markt und Momentum. Was war für euch der größte Aha-Moment im Gespräch mit Investoren?',
+      'Das trifft genau die Übersetzungsarbeit im frühen Fundraising: technische Substanz so erklären, dass ein Investor Risiko, Timing und Potenzial greifen kann. Welche Frage kam in euren Gesprächen immer wieder zurück?',
+    ];
+  }
+
   if (topic === 'Founder-Realität') {
     return [
       'Genau solche Aufbau-Momente sind oft wertvoller als die glatten Erfolgsgeschichten. Weil sie zeigen, wo aus Theorie echte Entscheidungen werden. Was war für dich der Punkt, an dem du gemerkt hast: Das muss ich jetzt anders lösen?',
@@ -1556,15 +1656,18 @@ async function moderateDmDrafts(dmDrafts, warmSignals, config, strategyText, not
 
 function makeConnectionDraft(opportunity) {
   const topic = inferTopic(opportunity);
+  const topicLabel = topic === 'Investor-Sprache'
+    ? 'Funding, Pitch und Klarheit'
+    : topic;
   const reason = topic === 'Investor-Sprache'
-    ? 'weil viele frühe Tech-Ideen genau an dieser Übersetzung zwischen Produkt, Markt und Investorensprache scheitern'
+    ? 'weil frühe Tech-Ideen genau an dieser Übersetzung zwischen Produkt, Markt und Risiko oft gewinnen oder verlieren'
     : 'weil offene Aufbau-Momente oft mehr zeigen als glatte Erfolgsgeschichten';
   return {
     opportunityKey: opportunityKey(opportunity),
     profile: opportunity.name,
     profileUrl: opportunity.url,
     postIndex: opportunity.postIndex,
-    text: `Ich habe deinen aktuellen Post über ${topic} gelesen. Das hat mich angesprochen, ${reason}. Ich baue gerade ein Netzwerk mit Gründern, die offen über Aufbau und Klarheit sprechen. Wenn du magst, lass uns verbinden.`,
+    text: `Ich habe deinen aktuellen Post über ${topicLabel} gelesen. Das hat mich angesprochen, ${reason}. Ich baue gerade ein Netzwerk mit Gründern, die offen über Aufbau und Klarheit sprechen. Wenn du magst, lass uns verbinden.`,
   };
 }
 
