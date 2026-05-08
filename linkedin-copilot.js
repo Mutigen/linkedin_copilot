@@ -1488,6 +1488,7 @@ async function callAnthropicCommentAgent({ draft, opportunity, config, strategyT
     'Levan entscheidet die Relevanz selbst, indem er einen Beitrag in das Tool einfuegt. Deine Aufgabe ist nicht, den Beitrag auszusortieren, sondern Levans bestmoegliche Antwort zu formulieren.',
     'Nutze den konkreten Beitrag als Quelle. Erfinde keine eigenen Erfahrungen, keine Zahlen, keine Ich-/Wir-Story und keine Fakten ueber Levan.',
     'Behaupte nicht, dass Levan etwas staendig sieht, mit bestimmten Kunden arbeitet oder genau diese Situation selbst erlebt hat. Keine Saetze wie "Ich sehe das staendig", "Ich arbeite mit", "bei uns", "wir haben".',
+    'Auch im reason-Feld keine Behauptungen ueber Levans Erfahrung, Kundenarbeit oder Biografie. Begruende nur mit Post-Inhalt, Strategie und Tonalitaet.',
     'Schreibe auf Deutsch, du-Form, ruhig, ehrlich, direkt, Founder-zu-Founder.',
     'Ton: kein generisches Lob, kein Sales-Pitch, keine Emoji, keine Links, kein Calendly, kein Hashtag-Spam.',
     'Der Kommentar soll wie ein echter Levan-Kommentar klingen: konkret am Post, mit einem klaren Gedanken, nicht wie Marketing-Copy.',
@@ -1812,6 +1813,7 @@ async function callAnthropicDmAgent({ draft, signal, config, strategyText }) {
     'Die DM soll wie eine echte kurze Nachricht klingen, nicht wie Copywriting.',
     'Nutze Signal, Profil, Thema und Levans Strategie. Erfinde keine Fakten und keine Beziehung, die nicht genannt wurde.',
     'Behaupte nicht "bei uns", "wir haben", "ich arbeite mit" oder dass Levan gerade dasselbe Problem hat, ausser es steht explizit im Signal.',
+    'Auch im reason-Feld keine Behauptungen ueber Levans Erfahrung, Kundenarbeit oder Biografie. Begruende nur mit Signal, Strategie und Tonalitaet.',
     'Maximal 500 Zeichen. Ein kurzer Absatz. Hoechstens eine konkrete Rueckfrage am Ende.',
     'Antworte ausschliesslich als JSON: {"text":"...","reason":"..."}',
   ].join('\n');
