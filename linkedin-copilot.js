@@ -1356,6 +1356,9 @@ function opportunityKey(value) {
 function sanitizeDraftText(value) {
   return String(value || '')
     .replace(/https?:\/\/\S+/gi, '')
+    .replace(/Wenn es die zweite ist, jagst du deinen eigenen Schwanz\./gi, 'Wenn es die zweite ist, drehst du dich im Kreis.')
+    .replace(/jagst du deinen eigenen Schwanz/gi, 'drehst du dich im Kreis')
+    .replace(/den eigenen Schwanz jagen/gi, 'sich im Kreis drehen')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1430,6 +1433,7 @@ async function callAnthropicCommentModerator({ draft, opportunity, config, strat
     'Wenn nur der Entwurf thematisch nicht passt, der Post aber strategie-relevant ist, schreibe ihn als echten Kommentar neu.',
     'Erfinde keine eigenen Erfahrungen, keine Zahlen und keine Ich-/Wir-Story. Schreibe nicht so, als haette Levan die beschriebene Situation selbst erlebt.',
     'Ich-Form ist nur erlaubt fuer neutrale Wahrnehmung wie "Für mich" oder "Ich lese daraus". Keine Formulierungen wie "Als ich", "bei uns", "wir haben", "mein Bankkonto".',
+    'Keine derben oder wortwoertlichen Uebersetzungen. "Chase your own tail" auf Deutsch als "sich im Kreis drehen" formulieren.',
     'Wenn der Entwurf generisch klingt, Sales-CTA enthaelt, Links enthaelt, Emoji nutzt oder zu werblich ist, schreibe ihn um oder lehne ihn ab.',
     'Der finale Kommentar darf keine Links, keine Emoji, kein Calendly, keinen Pitch und kein generisches Lob enthalten.',
     'Das Feld text muss bei approve/rewrite ein direkt postbarer LinkedIn-Kommentar sein, kein Review, keine Analyse, keine Anweisung an Levan.',
