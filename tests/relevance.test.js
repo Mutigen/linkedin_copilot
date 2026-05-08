@@ -66,7 +66,7 @@ async function run() {
   assert.equal(investorResult.primaryComment.topic, 'Claude LinkedIn Voice Agent');
   assert.match(investorResult.primaryComment.why, /Nutzer hat den Beitrag ausgewählt/);
 
-  const founderLearningResult = await generateCommentFromBody({ postText: founderLearningPost });
+  const founderLearningResult = await generateCommentFromBody({ postText: founderLearningPost, commentDepth: 'x2' });
   assert.equal(founderLearningResult.ok, true);
   assert.equal(founderLearningResult.primaryComment.topic, 'Claude LinkedIn Voice Agent');
   assert.match(founderLearningResult.primaryComment.why, /Nutzer hat den Beitrag ausgewählt/);

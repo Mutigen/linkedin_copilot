@@ -420,6 +420,7 @@ function normalizeConfig(input) {
     manualProfiles: parseList(input.manualProfiles, []),
     manualPosts: parseList(input.manualPosts, []),
     warmSignals: parseList(input.warmSignals, []),
+    commentDepth: normalizeText(input.commentDepth || process.env.LINKEDIN_COMMENT_DEPTH || 'normal') === 'x2' ? 'x2' : 'normal',
     maxProfiles,
     maxRelatedProfilesPerSeed: Math.min(parseNumber(input.maxRelatedProfilesPerSeed, 10), 30),
     maxPostScrolls: Math.min(parseNumber(input.maxPostScrolls, 3), 10),
@@ -1367,7 +1368,8 @@ function extractOfferOneLiner(strategyText) {
   return match ? match[0].replace(/^"|"$/g, '') : 'Ich übersetze technische Startup-Ideen in Investor-Sprache — Website, Pitch, Positionierung — damit der nächste Investor-Call nicht an Kommunikation scheitert.';
 }
 
-function buildCommentVoiceGuide(strategyText) {
+function buildCommentVoiceGuide(strategyText, commentDepth = 'normal') {
+  const x2 = commentDepth === 'x2';
   return [
     'MUT-i-GEN LinkedIn Voice Guide fuer Kommentare und Verbindungsnachrichten',
     '',
@@ -1377,7 +1379,9 @@ function buildCommentVoiceGuide(strategyText) {
     '',
     'Stimme: Deutsch, du-Form, ehrlich, direkt, ruhig, Founder-zu-Founder. Kein Marketing-Sound. Kein generisches Lob. Keine Emoji. Keine Links.',
     'Kommentar-Ziel: am konkreten Post andocken, einen Gedanken schaerfen, eine Spannung sichtbar machen oder eine echte Folgefrage stellen.',
-    'Kommentar-Regeln: ein Absatz, 180 bis 420 Zeichen, maximal ein Fragezeichen. Kein Pitch, kein Angebot, kein Hinweis auf mutigen.de.',
+    x2
+      ? 'Kommentar-Regeln X2: ein tieferer Kommentar, 420 bis 850 Zeichen, ein bis zwei kurze Absaetze. Den Gedanken nicht aufblasen, sondern eine Ebene tiefer fuehren: Ursache, Spannung, Konsequenz oder blinder Fleck. Maximal ein Fragezeichen. Kein Pitch, kein Angebot, kein Hinweis auf mutigen.de.'
+      : 'Kommentar-Regeln: ein Absatz, 180 bis 420 Zeichen, maximal ein Fragezeichen. Kein Pitch, kein Angebot, kein Hinweis auf mutigen.de.',
     'Erlaubte Moves: spezifischen Punkt spiegeln, Kontrast herausarbeiten, blinden Fleck benennen, ruhige Folgefrage stellen.',
     'Nicht behaupten: dass Levan diese Situation selbst erlebt hat, mit solchen Kunden arbeitet oder das staendig sieht. Keine erfundenen Ich-/Wir-Geschichten.',
     '',
@@ -1451,7 +1455,15 @@ function looksLikeMetaModerationText(text) {
 }
 
 function looksLikeInventedFirstPersonText(text) {
-  return /\b(als ich|bei mir|bei uns|wir haben|ich habe|ich machte|ich sehe das staendig|ich sehe das ständig|ich arbeite mit|mein(?:e[nsrm]?|em)?\s+(bankkonto|pitch|zahlen|team|startup|produkt)|unsere seed|unser pitch)\b/i.test(String(text || ''));
+  return /\b(als ich|bei mir|bei uns|wir haben|ich habe|ich machte|ich sehe das staendig|ich sehe das ständig|ich sehe .*immer wieder|immer wieder sehe|ich arbeite mit|mein(?:e[nsrm]?|em)?\s+(bankkonto|pitch|zahlen|team|startup|produkt)|unsere seed|unser pitch)\b/i.test(String(text || ''));
+}
+
+function isConnectionRequestStage(stage) {
+  return /verbindungsanfrage/i.test(String(stage || ''));
+}
+
+function looksLikeConnectionRequestText(text) {
+  return /\b(verbinden|vernetzen|kontakt)\b/i.test(String(text || ''));
 }
 
 function commentVariantsForOpportunity(opportunity, topic) {
@@ -1522,6 +1534,7 @@ function makeCommentDraft(opportunity, index) {
 async function callAnthropicCommentAgent({ draft, opportunity, config, strategyText }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.commentModelTimeoutMs);
+  const x2Comment = config.commentDepth === 'x2';
   const system = [
     'Du bist der spezialisierte LinkedIn-Kommentar-Agent fuer Levan Lomidze / MUT-i-GEN.',
     'Levan entscheidet die Relevanz selbst, indem er einen Beitrag in das Tool einfuegt. Deine Aufgabe ist nicht, den Beitrag auszusortieren, sondern Levans bestmoegliche Antwort zu formulieren.',
@@ -1532,7 +1545,9 @@ async function callAnthropicCommentAgent({ draft, opportunity, config, strategyT
     'Ton: kein generisches Lob, kein Sales-Pitch, keine Emoji, keine Links, kein Calendly, kein Hashtag-Spam.',
     'Der Kommentar soll wie ein echter Levan-Kommentar klingen: konkret am Post, mit einem klaren Gedanken, nicht wie Marketing-Copy.',
     'Wenn der Post Englisch ist, antworte trotzdem auf Deutsch, aber greife die echten Begriffe und Spannung des Posts sauber auf.',
-    'Laenge Kommentar: 180 bis 420 Zeichen. Ein Absatz. Optional eine echte Rueckfrage, aber nur wenn sie natuerlich wirkt. Maximal ein Fragezeichen.',
+    x2Comment
+      ? 'Laenge Kommentar: X2 aktiv. Schreibe 420 bis 850 Zeichen, doppelt so substanziell und eine Ebene tiefer. Ein bis zwei kurze Absaetze. Optional eine echte Rueckfrage, aber nur wenn sie natuerlich wirkt. Maximal ein Fragezeichen.'
+      : 'Laenge Kommentar: 180 bis 420 Zeichen. Ein Absatz. Optional eine echte Rueckfrage, aber nur wenn sie natuerlich wirkt. Maximal ein Fragezeichen.',
     'Erzeuge auch eine optionale Verbindungsnachricht. Nur wenn sie natuerlich ist. Maximal 300 Zeichen, ruhig, nicht pushy, kein Pitch, kein Service-Angebot.',
     'Die Verbindungsnachricht darf nicht behaupten "ich arbeite mit...". Besser: "Ich beschaeftige mich viel mit..." oder direkt beim Post bleiben.',
     'Wenn eine Verbindungsnachricht unpassend waere, gib connectionText als leeren String zurueck.',
@@ -1544,7 +1559,8 @@ async function callAnthropicCommentAgent({ draft, opportunity, config, strategyT
     rawPostText: compactSnippet(opportunity.rawPostText, 5000),
     existingFallbackComment: draft.text,
     existingFallbackConnection: draft.connectionText || '',
-    mutigenVoiceGuide: buildCommentVoiceGuide(strategyText),
+    commentDepth: x2Comment ? 'X2: doppelt und tiefer' : 'normal',
+    mutigenVoiceGuide: buildCommentVoiceGuide(strategyText, config.commentDepth),
   };
 
   try {
@@ -1844,14 +1860,16 @@ async function callAnthropicDmModerator({ draft, signal, config, strategyText })
 async function callAnthropicDmAgent({ draft, signal, config, strategyText }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.dmModelTimeoutMs);
+  const connectionRequest = isConnectionRequestStage(draft.stage);
   const system = [
     'Du bist der spezialisierte LinkedIn-DM-Agent fuer Levan Lomidze / MUT-i-GEN.',
     'Levan entscheidet, dass ein warmes Signal relevant ist. Deine Aufgabe ist, daraus eine ruhige, echte 1:1-Nachricht zu formulieren.',
     'Schreibe Deutsch, du-Form, ehrlich, direkt, Founder-zu-Founder.',
     'Keine Emoji, keine Links, kein Calendly, kein Pitch, kein Sales-Druck, kein generisches Lob.',
     'Die DM soll wie eine echte kurze Nachricht klingen, nicht wie Copywriting.',
+    'Wenn stage "Verbindungsanfrage nach echter Interaktion" ist: Schreibe keine DM-Follow-up-Frage. Schreibe eine kurze LinkedIn-Verbindungsnachricht mit konkretem Bezug und Einladung zum Verbinden oder Vernetzen.',
     'Nutze Signal, Profil, Thema und Levans Strategie. Erfinde keine Fakten und keine Beziehung, die nicht genannt wurde.',
-    'Behaupte nicht "bei uns", "wir haben", "ich arbeite mit" oder dass Levan gerade dasselbe Problem hat, ausser es steht explizit im Signal.',
+    'Behaupte nicht "bei uns", "wir haben", "ich arbeite mit", "ich sehe das immer wieder" oder dass Levan gerade dasselbe Problem hat, ausser es steht explizit im Signal.',
     'Auch im reason-Feld keine Behauptungen ueber Levans Erfahrung, Kundenarbeit oder Biografie. Begruende nur mit Signal, Strategie und Tonalitaet.',
     'Maximal 500 Zeichen. Ein kurzer Absatz. Hoechstens eine konkrete Rueckfrage am Ende.',
     'Antworte ausschliesslich als JSON: {"text":"...","reason":"..."}',
@@ -1884,7 +1902,7 @@ async function callAnthropicDmAgent({ draft, signal, config, strategyText }) {
         messages: [
           {
             role: 'user',
-            content: `Formuliere eine LinkedIn-DM aus diesem warmen Signal.\n\n${JSON.stringify(userPayload, null, 2)}`,
+            content: `Formuliere eine LinkedIn-${connectionRequest ? 'Verbindungsnachricht' : 'DM'} aus diesem warmen Signal.\n\n${JSON.stringify(userPayload, null, 2)}`,
           },
         ],
       }),
@@ -1910,6 +1928,10 @@ async function callAnthropicDmAgent({ draft, signal, config, strategyText }) {
 
     if (looksLikeInventedFirstPersonText(text)) {
       return { decision: 'rewrite', text: draft.text, reason: `Claude erfand eine Ich-/Wir-Erfahrung; Fallback verwendet. ${reason}` };
+    }
+
+    if (connectionRequest && !looksLikeConnectionRequestText(text)) {
+      return { decision: 'rewrite', text: draft.text, reason: `Claude lieferte keine klare Verbindungsnachricht; Fallback verwendet. ${reason}` };
     }
 
     return { decision: 'rewrite', text, reason };
@@ -2008,16 +2030,24 @@ function makeConnectionDraft(opportunity) {
 function makeDmDrafts(warmSignals) {
   if (warmSignals.length === 0) return [];
 
-  return warmSignals.map((signal) => ({
-    stage: signal.stage || 'DM an warmen Lead nach Signal oder Antwort',
-    trigger: signal.trigger || signal.reactionType || 'Warme Reaktion',
-    profile: signal.name || signal.profile || '',
-    postTopic: signal.postTopic || '',
-    userPoint: signal.userPoint || '',
-    signalText: signal.signalText || signal.trigger || signal.reactionType || '',
-    voiceAgent: true,
-    text: `Danke für deine Reaktion zu ${signal.postTopic || 'dem Thema'}. Was du geschrieben hast, hat bei mir angedockt. Wo stehst du gerade damit konkret?`,
-  }));
+  return warmSignals.map((signal) => {
+    const stage = signal.stage || 'DM an warmen Lead nach Signal oder Antwort';
+    const connectionRequest = isConnectionRequestStage(stage);
+    const postTopic = signal.postTopic || 'dem Thema';
+    const userPoint = signal.userPoint || signal.signalText || signal.trigger || 'deinem Punkt';
+    return {
+      stage,
+      trigger: signal.trigger || signal.reactionType || 'Warme Reaktion',
+      profile: signal.name || signal.profile || '',
+      postTopic: signal.postTopic || '',
+      userPoint: signal.userPoint || '',
+      signalText: signal.signalText || signal.trigger || signal.reactionType || '',
+      voiceAgent: true,
+      text: connectionRequest
+        ? `Ich habe deinen Beitrag zu ${postTopic} gelesen. Der Punkt zu ${userPoint} ist hängen geblieben. Lass uns gern verbinden.`
+        : `Danke für deine Reaktion zu ${postTopic}. Was du geschrieben hast, hat bei mir angedockt. Wo stehst du gerade damit konkret?`,
+    };
+  });
 }
 
 function makeDmTemplates() {

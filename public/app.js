@@ -11,6 +11,8 @@ const profileInput = document.getElementById('profileInput');
 const topicInput = document.getElementById('topicInput');
 const triggerInput = document.getElementById('triggerInput');
 const stageInput = document.getElementById('stageInput');
+const x2Input = document.getElementById('x2Input');
+const x2ToggleWrap = document.getElementById('x2ToggleWrap');
 const template = document.getElementById('messageTemplate');
 const modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
 const todoList = document.getElementById('todoList');
@@ -194,12 +196,14 @@ function setMode(nextMode) {
     mainInput.placeholder = 'Hier den fremden LinkedIn-Post einfügen ...';
     helperText.textContent = 'Post rein, Klick auf Senden, Kommentar zurück.';
     submitButton.textContent = 'Kommentar holen';
+    x2ToggleWrap.classList.remove('hidden');
     dmFields.classList.add('hidden');
   } else {
     mainLabel.textContent = 'Signal oder Kontext einfügen';
     mainInput.placeholder = 'z. B. Was die Person kommentiert hat oder worauf die DM reagieren soll ...';
     helperText.textContent = 'Signal rein, Tagesziel wählen, Vorlage zurück.';
     submitButton.textContent = 'Vorlage holen';
+    x2ToggleWrap.classList.add('hidden');
     dmFields.classList.remove('hidden');
   }
 }
@@ -301,7 +305,10 @@ composer.addEventListener('submit', async (event) => {
 
   try {
     if (mode === 'comment') {
-      const data = await callApi('/api/linkedin/comment', { postText: input });
+      const data = await callApi('/api/linkedin/comment', {
+        postText: input,
+        commentDepth: x2Input.checked ? 'x2' : 'normal',
+      });
       chat.removeChild(chat.lastElementChild);
       renderCommentResponse(data);
     } else {
