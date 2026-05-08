@@ -1394,9 +1394,8 @@ function buildDmVoiceGuide(strategyText) {
     'Stimme: Deutsch, du-Form, ehrlich, direkt, ruhig, Founder-zu-Founder. Kein Marketing-Sound. Keine Emoji. Keine Links.',
     '',
     'DM-Prinzip: warmes Signal ernst nehmen, konkret auf den Punkt reagieren, eine echte Rueckfrage stellen.',
-    'Like oder Kommentar: bedanken, konkreten Punkt spiegeln, fragen wo die Person gerade damit steht. Kein Pitch.',
-    'Antwort im DM-Thread: auf die Antwort eingehen, Vertrauen aufbauen, wieder konkret fragen. Kein Pitch, solange kein Interesse/Bedarf signalisiert wurde.',
-    'Interesse oder konkrete Nachfrage: kurz und ruhig sagen, wobei Levan helfen kann, aber nur wenn das Signal wirklich danach klingt.',
+    'Verbindungsanfrage nach echter Interaktion: kurze Einladung zum Vernetzen. Konkreten Bezug nennen. Kein Pitch.',
+    'DM an warmen Lead nach Signal oder Antwort: bedanken, konkreten Punkt spiegeln, fragen wo die Person gerade damit steht. Kein Pitch, solange kein echtes Interesse oder Bedarf signalisiert wurde.',
     'Nicht behaupten: dass Levan dieselbe Situation gerade hat, mit solchen Kunden arbeitet oder eine Beziehung besteht, die nicht genannt wurde.',
     'Maximal 500 Zeichen. Ein kurzer Absatz. Hoechstens eine konkrete Rueckfrage am Ende.',
   ].join('\n');
@@ -2010,7 +2009,7 @@ function makeDmDrafts(warmSignals) {
   if (warmSignals.length === 0) return [];
 
   return warmSignals.map((signal) => ({
-    stage: signal.stage || 'Like oder Kommentar auf meinen Post',
+    stage: signal.stage || 'DM an warmen Lead nach Signal oder Antwort',
     trigger: signal.trigger || signal.reactionType || 'Warme Reaktion',
     profile: signal.name || signal.profile || '',
     postTopic: signal.postTopic || '',
@@ -2024,19 +2023,14 @@ function makeDmDrafts(warmSignals) {
 function makeDmTemplates() {
   return [
     {
-      stage: 'Like oder Kommentar auf meinen Post',
-      trigger: 'Like oder Kommentar auf deinen Post',
-      text: 'Danke für deine Reaktion auf meinen Post zu [Post-Thema]. Was du geschrieben hast über [ihr Punkt] — das kenne ich gut. Wo stehst du gerade damit konkret?',
+      stage: 'Verbindungsanfrage nach echter Interaktion',
+      trigger: 'echte Interaktion mit fremdem Post',
+      text: 'Ich habe deinen Beitrag zu [Post-Thema] gelesen. Der Punkt zu [ihr Punkt] ist hängen geblieben. Lass uns gern verbinden.',
     },
     {
-      stage: 'Antwort im DM-Thread',
-      trigger: 'Antwort auf deine erste DM',
-      text: 'Verstehe. Gerade dieser Punkt ist bei vielen frühen Gründern der Moment, wo aus einer guten Idee noch kein klares Fundament wird. Was ist im Moment der konkrete Engpass: Website, Pitch oder Positionierung?',
-    },
-    {
-      stage: 'Interesse oder konkrete Nachfrage',
-      trigger: 'Interesse oder klare Bedarfssignale',
-      text: 'Wenn du gerade aufbaust und das hier etwas ausgelöst hat, erzähl mir kurz, wo du stehst. Ich schau mir an, ob ich helfen kann.',
+      stage: 'DM an warmen Lead nach Signal oder Antwort',
+      trigger: 'warmes Signal oder Antwort',
+      text: 'Danke für deine Reaktion auf meinen Post zu [Post-Thema]. Was du geschrieben hast über [ihr Punkt] hat bei mir angedockt. Wo stehst du gerade damit konkret?',
     },
   ];
 }

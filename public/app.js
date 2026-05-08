@@ -19,9 +19,33 @@ const todoDate = document.getElementById('todoDate');
 let mode = 'comment';
 const todoStorageKey = `linkedin-ui-todos-${new Date().toISOString().slice(0, 10)}`;
 const todoDefinitions = [
-  { id: 'comments', title: '5 Kommentare auf fremden Posts', hint: 'Tägliches Engagement aus der Strategie', target: 5 },
-  { id: 'connections', title: '2 Verbindungsanfragen', hint: 'Nur nach echter Interaktion', target: 2 },
-  { id: 'dms', title: '2 DMs an warme Leads', hint: 'Reaktiv nach Signal oder Antwort', target: 2 },
+  {
+    id: 'comments',
+    title: '5 Kommentare auf fremden Posts',
+    hint: 'Tägliches Engagement aus der Strategie',
+    target: 5,
+    stage: 'Kommentar auf fremden Post',
+  },
+  {
+    id: 'connections',
+    title: '2 Verbindungsanfragen',
+    hint: 'Nur nach echter Interaktion',
+    target: 2,
+    stage: 'Verbindungsanfrage nach echter Interaktion',
+    defaultTrigger: 'echte Interaktion mit fremdem Post',
+    triggerPlaceholder: 'z. B. Kommentar auf fremden Post',
+    selectableInDm: true,
+  },
+  {
+    id: 'dms',
+    title: '2 DMs an warme Leads',
+    hint: 'Reaktiv nach Signal oder Antwort',
+    target: 2,
+    stage: 'DM an warmen Lead nach Signal oder Antwort',
+    defaultTrigger: 'warmes Signal oder Antwort',
+    triggerPlaceholder: 'z. B. Kommentar auf meinen Post',
+    selectableInDm: true,
+  },
 ];
 
 function loadTodos() {
@@ -64,6 +88,35 @@ function updateTodo(id, nextCount) {
   });
   saveTodos();
   renderTodos();
+}
+
+function incrementTodo(id) {
+  updateTodo(id, (todos.find((item) => item.id === id)?.count || 0) + 1);
+}
+
+function getTodoDefinition(id) {
+  return todoDefinitions.find((item) => item.id === id) || todoDefinitions.find((item) => item.id === 'dms');
+}
+
+function getSelectedDmTask() {
+  return getTodoDefinition(stageInput.value);
+}
+
+function renderDmTaskOptions() {
+  stageInput.innerHTML = '';
+  todoDefinitions
+    .filter((item) => item.selectableInDm)
+    .forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.title;
+      stageInput.appendChild(option);
+    });
+}
+
+function syncDmTaskFields() {
+  const selectedTask = getSelectedDmTask();
+  triggerInput.placeholder = selectedTask.triggerPlaceholder || 'z. B. Signal oder Kontext';
 }
 
 function renderTodos() {
@@ -145,8 +198,8 @@ function setMode(nextMode) {
   } else {
     mainLabel.textContent = 'Signal oder Kontext einfügen';
     mainInput.placeholder = 'z. B. Was die Person kommentiert hat oder worauf die DM reagieren soll ...';
-    helperText.textContent = 'Signal rein, optional Thema/Trigger ergänzen, DM-Vorlage zurück.';
-    submitButton.textContent = 'DM-Vorlage holen';
+    helperText.textContent = 'Signal rein, Tagesziel wählen, Vorlage zurück.';
+    submitButton.textContent = 'Vorlage holen';
     dmFields.classList.remove('hidden');
   }
 }
@@ -157,7 +210,7 @@ function renderCommentResponse(data) {
     return;
   }
 
-  updateTodo('comments', (todos.find((item) => item.id === 'comments')?.count || 0) + 1);
+  incrementTodo('comments');
 
   let text = `Primärer Kommentar\n\n${data.primaryComment.text}`;
 
@@ -173,6 +226,7 @@ function renderCommentResponse(data) {
   }
 
   if (Array.isArray(data.connectionDrafts) && data.connectionDrafts.length > 0) {
+    incrementTodo('connections');
     text += `\n\nPassende Verbindungsnachricht\n\n${data.connectionDrafts[0].text}`;
   }
 
@@ -187,15 +241,16 @@ function renderCommentResponse(data) {
   addMessage('assistant', text);
 }
 
-function renderDmResponse(data) {
+function renderDmResponse(data, todoId) {
   if (!data.ok || !data.primaryDm) {
     addMessage('assistant', data.message || 'Keine DM-Vorlage erzeugt.');
     return;
   }
 
-  updateTodo('dms', (todos.find((item) => item.id === 'dms')?.count || 0) + 1);
+  incrementTodo(todoId || 'dms');
 
-  let text = `Primäre DM-Vorlage\n\n${data.primaryDm.text}`;
+  const title = todoId === 'connections' ? 'Primäre Verbindungsnachricht' : 'Primäre DM-Vorlage';
+  let text = `${title}\n\n${data.primaryDm.text}`;
 
   if (data.primaryDm.modelModeration) {
     text += `\n\nModellprüfung\n${data.primaryDm.modelModeration.decision} · ${data.primaryDm.modelModeration.model}`;
@@ -233,6 +288,8 @@ modeButtons.forEach((button) => {
   button.addEventListener('click', () => setMode(button.dataset.mode));
 });
 
+stageInput.addEventListener('change', syncDmTaskFields);
+
 composer.addEventListener('submit', async (event) => {
   event.preventDefault();
   const input = mainInput.value.trim();
@@ -240,7 +297,7 @@ composer.addEventListener('submit', async (event) => {
 
   submitButton.disabled = true;
   addMessage('user', input);
-  addMessage('system', mode === 'comment' ? 'Kommentar wird erzeugt ...' : 'DM-Vorlage wird erzeugt ...');
+  addMessage('system', mode === 'comment' ? 'Kommentar wird erzeugt ...' : 'Vorlage wird erzeugt ...');
 
   try {
     if (mode === 'comment') {
@@ -248,15 +305,17 @@ composer.addEventListener('submit', async (event) => {
       chat.removeChild(chat.lastElementChild);
       renderCommentResponse(data);
     } else {
+      const selectedTask = getSelectedDmTask();
       const data = await callApi('/api/linkedin/dm', {
         signalText: input,
         profile: profileInput.value.trim(),
         postTopic: topicInput.value.trim(),
-        trigger: triggerInput.value.trim(),
-        stage: stageInput.value,
+        trigger: triggerInput.value.trim() || selectedTask.defaultTrigger,
+        stage: selectedTask.stage,
+        dailyTaskId: selectedTask.id,
       });
       chat.removeChild(chat.lastElementChild);
-      renderDmResponse(data);
+      renderDmResponse(data, selectedTask.id);
     }
   } catch (error) {
     chat.removeChild(chat.lastElementChild);
@@ -266,6 +325,8 @@ composer.addEventListener('submit', async (event) => {
   }
 });
 
+renderDmTaskOptions();
+syncDmTaskFields();
 setMode('comment');
 formatTodoDate();
 renderTodos();
