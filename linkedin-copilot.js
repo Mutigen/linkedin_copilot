@@ -1377,13 +1377,30 @@ function looksLikeMetaModerationText(text) {
   return /(dein kommentar|dein entwurf|der post dreht sich|das passt thematisch nicht|schreib einen kommentar|rewrite:|thematischer mismatch|pitch-coaching|kommentar spricht)/i.test(String(text || ''));
 }
 
+function looksLikeInventedFirstPersonText(text) {
+  return /\b(als ich|bei mir|bei uns|wir haben|ich habe|ich machte|mein(?:e[nsrm]?|em)?\s+(bankkonto|pitch|zahlen|team|startup|produkt)|unsere seed|unser pitch)\b/i.test(String(text || ''));
+}
+
+function commentVariantsForOpportunity(opportunity, topic) {
+  const founderStoryTerms = (opportunity.postRelevance?.founderStoryMatchedTerms || []).join(' ');
+  if (topic === 'Founder-Realität' && /worst advice|growth|sustainability|vanity metrics|solve problems|customers|bank account/.test(founderStoryTerms)) {
+    return [
+      'Das ist ein harter, aber wichtiger Punkt: Wachstum sieht im Pitch Deck schnell gut aus, aber ohne echten Kundennutzen bleibt es nur eine Zahl. Bank Account statt Vanity Metrics ist wahrscheinlich eine der ehrlichsten Prüfungen im Aufbau.',
+      'Der Unterschied zwischen Wachstum und Substanz wird im Aufbau oft zu spät sichtbar. Große Zahlen beeindrucken kurz, aber echte Probleme lösen bleibt das, was trägt. Genau diese Lernkurve ist wertvoll.',
+      'Starker Founder-Learning. Wachstum ohne Nachhaltigkeit kann wie Fortschritt aussehen, bis man merkt, dass Kundenwert und Cash-Realität nicht mitziehen. Genau da trennt sich Signal von Theater.',
+    ];
+  }
+
+  return commentVariantsForTopic(topic);
+}
+
 function makeCommentDraft(opportunity, index) {
   const topic = inferTopic(opportunity);
   const directTerms = opportunity.postRelevance?.directMatchedTerms || opportunity.postRelevance?.matchedTerms || [];
   const founderStoryTerms = opportunity.postRelevance?.founderStoryMatchedTerms || [];
   const anchorTerms = directTerms.length > 0 ? directTerms : founderStoryTerms;
   const postSnippet = snippetAroundTerms(opportunity.postText, anchorTerms, 220);
-  const variants = commentVariantsForTopic(topic);
+  const variants = commentVariantsForOpportunity(opportunity, topic);
 
   return {
     opportunityKey: opportunityKey(opportunity),
@@ -1411,6 +1428,8 @@ async function callAnthropicCommentModerator({ draft, opportunity, config, strat
     'Strategie-relevante Posts sind: Founder erzaehlt echte Erfahrung, Fehler, Rueckschlag, Wendepunkt, Aufbau, Cashflow, Runway, Launch, erste Kunden, Lernen; oder Pre-Seed, Seed, Fundraising, Investoren, Pitch, Investorensprache; oder Positionierung, Klarheit, Story, Website, Vertrauen im Startup-Kontext.',
     'Wenn der Post selbst nicht in diese Strategie passt, lehne ab.',
     'Wenn nur der Entwurf thematisch nicht passt, der Post aber strategie-relevant ist, schreibe ihn als echten Kommentar neu.',
+    'Erfinde keine eigenen Erfahrungen, keine Zahlen und keine Ich-/Wir-Story. Schreibe nicht so, als haette Levan die beschriebene Situation selbst erlebt.',
+    'Ich-Form ist nur erlaubt fuer neutrale Wahrnehmung wie "Für mich" oder "Ich lese daraus". Keine Formulierungen wie "Als ich", "bei uns", "wir haben", "mein Bankkonto".',
     'Wenn der Entwurf generisch klingt, Sales-CTA enthaelt, Links enthaelt, Emoji nutzt oder zu werblich ist, schreibe ihn um oder lehne ihn ab.',
     'Der finale Kommentar darf keine Links, keine Emoji, kein Calendly, keinen Pitch und kein generisches Lob enthalten.',
     'Das Feld text muss bei approve/rewrite ein direkt postbarer LinkedIn-Kommentar sein, kein Review, keine Analyse, keine Anweisung an Levan.',
@@ -1471,6 +1490,14 @@ async function callAnthropicCommentModerator({ draft, opportunity, config, strat
 
     if ((decision === 'approve' || decision === 'rewrite') && looksLikeMetaModerationText(text)) {
       return { decision: 'reject', text: '', reason: `Modell lieferte Meta-Review statt postbarem Kommentar: ${reason}` };
+    }
+
+    if ((decision === 'approve' || decision === 'rewrite') && looksLikeInventedFirstPersonText(text)) {
+      return {
+        decision: 'rewrite',
+        text: draft.text,
+        reason: `Modell erfand eine Ich-/Wir-Erfahrung; sicherer regelbasierter Entwurf verwendet. ${reason}`,
+      };
     }
 
     return { decision, text, reason };
