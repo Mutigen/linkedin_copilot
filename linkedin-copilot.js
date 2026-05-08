@@ -1211,6 +1211,37 @@ function buildOpportunities(profiles, config) {
 
     let relevantPostCount = 0;
     for (const post of recentPosts) {
+      if (profile.source === 'manual_post') {
+        relevantPostCount += 1;
+        evaluatedOpportunityCount += 1;
+        opportunities.push({
+          username: profile.username,
+          name,
+          url: profile.url,
+          source: profile.source,
+          category: classification.category,
+          classificationReason: 'Vom Nutzer ausgewählter Beitrag; keine Code-Relevanzfilter',
+          postIndex: post.feedIndex,
+          postText: post.text,
+          rawPostText: post.rawText,
+          postRelevance: {
+            relevant: true,
+            score: 1,
+            reasons: ['Nutzer hat den Beitrag ausgewählt'],
+            matchedTerms: [],
+            directMatchedTerms: [],
+            contextMatchedTerms: [],
+            founderStoryMatchedTerms: [],
+            hashtagOnlyMatchedTerms: [],
+          },
+          score: 1,
+          reasons: ['Nutzer hat den Beitrag ausgewählt'],
+          matchedTerms: [],
+          voiceAgent: true,
+        });
+        continue;
+      }
+
       const postScore = scoreRecentPostRelevance(post.text);
       evaluatedOpportunityCount += 1;
       if (!postScore.relevant) continue;
@@ -1381,7 +1412,7 @@ function looksLikeMetaModerationText(text) {
 }
 
 function looksLikeInventedFirstPersonText(text) {
-  return /\b(als ich|bei mir|bei uns|wir haben|ich habe|ich machte|mein(?:e[nsrm]?|em)?\s+(bankkonto|pitch|zahlen|team|startup|produkt)|unsere seed|unser pitch)\b/i.test(String(text || ''));
+  return /\b(als ich|bei mir|bei uns|wir haben|ich habe|ich machte|ich sehe das staendig|ich sehe das ständig|ich arbeite mit|mein(?:e[nsrm]?|em)?\s+(bankkonto|pitch|zahlen|team|startup|produkt)|unsere seed|unser pitch)\b/i.test(String(text || ''));
 }
 
 function commentVariantsForOpportunity(opportunity, topic) {
@@ -1397,7 +1428,35 @@ function commentVariantsForOpportunity(opportunity, topic) {
   return commentVariantsForTopic(topic);
 }
 
+function fallbackVoiceAgentComment(postText) {
+  const snippet = compactSnippet(postText, 180);
+  return `Für mich steckt hier ein wichtiger Punkt drin: ${snippet}. Genau solche Stellen zeigen oft, wo aus einer Idee echte Klarheit werden muss.`;
+}
+
+function fallbackVoiceAgentConnection(postText) {
+  return 'Ich habe deinen Post gelesen. Der Punkt hat bei mir hängen geblieben, weil er sehr ehrlich auf Aufbau und Klarheit schaut. Lass uns gern verbinden.';
+}
+
 function makeCommentDraft(opportunity, index) {
+  if (opportunity.voiceAgent) {
+    return {
+      opportunityKey: opportunityKey(opportunity),
+      voiceAgent: true,
+      topic: 'Claude LinkedIn Voice Agent',
+      profile: opportunity.name,
+      profileUrl: opportunity.url,
+      postIndex: opportunity.postIndex,
+      score: opportunity.score,
+      why: 'Nutzer hat den Beitrag ausgewählt; Claude formuliert nach MUT-i-GEN Strategie und Levans LinkedIn-Stimme.',
+      postSnippet: compactSnippet(opportunity.postText, 320),
+      postMatchedTerms: [],
+      postFounderStoryTerms: [],
+      postContextTerms: [],
+      text: fallbackVoiceAgentComment(opportunity.postText),
+      connectionText: fallbackVoiceAgentConnection(opportunity.postText),
+    };
+  }
+
   const topic = inferTopic(opportunity);
   const directTerms = opportunity.postRelevance?.directMatchedTerms || opportunity.postRelevance?.matchedTerms || [];
   const founderStoryTerms = opportunity.postRelevance?.founderStoryMatchedTerms || [];
@@ -1419,6 +1478,90 @@ function makeCommentDraft(opportunity, index) {
     postContextTerms: opportunity.postRelevance?.contextMatchedTerms || [],
     text: variants[index % variants.length],
   };
+}
+
+async function callAnthropicCommentAgent({ draft, opportunity, config, strategyText }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.commentModelTimeoutMs);
+  const system = [
+    'Du bist der spezialisierte LinkedIn-Kommentar-Agent fuer Levan Lomidze / MUT-i-GEN.',
+    'Levan entscheidet die Relevanz selbst, indem er einen Beitrag in das Tool einfuegt. Deine Aufgabe ist nicht, den Beitrag auszusortieren, sondern Levans bestmoegliche Antwort zu formulieren.',
+    'Nutze den konkreten Beitrag als Quelle. Erfinde keine eigenen Erfahrungen, keine Zahlen, keine Ich-/Wir-Story und keine Fakten ueber Levan.',
+    'Behaupte nicht, dass Levan etwas staendig sieht, mit bestimmten Kunden arbeitet oder genau diese Situation selbst erlebt hat. Keine Saetze wie "Ich sehe das staendig", "Ich arbeite mit", "bei uns", "wir haben".',
+    'Schreibe auf Deutsch, du-Form, ruhig, ehrlich, direkt, Founder-zu-Founder.',
+    'Ton: kein generisches Lob, kein Sales-Pitch, keine Emoji, keine Links, kein Calendly, kein Hashtag-Spam.',
+    'Der Kommentar soll wie ein echter Levan-Kommentar klingen: konkret am Post, mit einem klaren Gedanken, nicht wie Marketing-Copy.',
+    'Wenn der Post Englisch ist, antworte trotzdem auf Deutsch, aber greife die echten Begriffe und Spannung des Posts sauber auf.',
+    'Laenge Kommentar: 180 bis 420 Zeichen. Ein Absatz. Optional eine echte Rueckfrage, aber nur wenn sie natuerlich wirkt. Maximal ein Fragezeichen.',
+    'Erzeuge auch eine optionale Verbindungsnachricht. Nur wenn sie natuerlich ist. Maximal 300 Zeichen, ruhig, nicht pushy, kein Pitch, kein Service-Angebot.',
+    'Die Verbindungsnachricht darf nicht behaupten "ich arbeite mit...". Besser: "Ich beschaeftige mich viel mit..." oder direkt beim Post bleiben.',
+    'Wenn eine Verbindungsnachricht unpassend waere, gib connectionText als leeren String zurueck.',
+    'Antworte ausschliesslich als JSON: {"topic":"...","comment":"...","connectionText":"...","reason":"..."}',
+  ].join('\n');
+
+  const userPayload = {
+    postText: compactSnippet(opportunity.postText, 5000),
+    rawPostText: compactSnippet(opportunity.rawPostText, 5000),
+    existingFallbackComment: draft.text,
+    existingFallbackConnection: draft.connectionText || '',
+    mutigenStrategy: compactSnippet(strategyText, 4500),
+  };
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': config.anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: config.anthropicCommentModel,
+        max_tokens: config.commentModelMaxTokens,
+        temperature: 0.35,
+        system,
+        messages: [
+          {
+            role: 'user',
+            content: `Formuliere Kommentar und optionale Verbindungsnachricht fuer diesen LinkedIn-Beitrag.\n\n${JSON.stringify(userPayload, null, 2)}`,
+          },
+        ],
+      }),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Anthropic API ${response.status}: ${responseText.slice(0, 300)}`);
+    }
+
+    const data = JSON.parse(responseText);
+    const modelText = (data.content || [])
+      .filter((item) => item.type === 'text' && item.text)
+      .map((item) => item.text)
+      .join('\n');
+    const parsed = parseJsonFromModelText(modelText);
+    const text = sanitizeDraftText(parsed.comment || parsed.text || draft.text);
+    const connectionText = sanitizeDraftText(parsed.connectionText || '');
+    const reason = sanitizeDraftText(parsed.reason || 'Claude LinkedIn Voice Agent');
+    const topic = sanitizeDraftText(parsed.topic || 'Claude LinkedIn Voice Agent');
+
+    if (!text || looksLikeMetaModerationText(text)) {
+      return { decision: 'rewrite', text: draft.text, connectionText: draft.connectionText || '', topic, reason: `Claude lieferte keinen postbaren Kommentar; Fallback verwendet. ${reason}` };
+    }
+
+    if (looksLikeInventedFirstPersonText(text)) {
+      return { decision: 'rewrite', text: draft.text, connectionText, topic, reason: `Claude erfand eine Ich-/Wir-Erfahrung; Fallback verwendet. ${reason}` };
+    }
+
+    if (connectionText && looksLikeInventedFirstPersonText(connectionText)) {
+      return { decision: 'rewrite', text, connectionText: '', topic, reason: `Claude erfand eine Ich-/Wir-Erfahrung in der Verbindungsnachricht; Verbindungsnachricht verworfen. ${reason}` };
+    }
+
+    return { decision: 'rewrite', text, connectionText, topic, reason };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function callAnthropicCommentModerator({ draft, opportunity, config, strategyText }) {
@@ -1541,7 +1684,9 @@ async function moderateCommentDrafts(commentDrafts, opportunities, config, strat
     summary.attempted += 1;
 
     try {
-      const result = await callAnthropicCommentModerator({ draft, opportunity, config, strategyText });
+      const result = draft.voiceAgent
+        ? await callAnthropicCommentAgent({ draft, opportunity, config, strategyText })
+        : await callAnthropicCommentModerator({ draft, opportunity, config, strategyText });
       if (result.decision === 'reject' || !result.text) {
         summary.rejected += 1;
         rejectedKeys.add(draft.opportunityKey);
@@ -1553,7 +1698,9 @@ async function moderateCommentDrafts(commentDrafts, opportunities, config, strat
 
       moderatedDrafts.push({
         ...draft,
+        topic: result.topic || draft.topic,
         text: result.text,
+        connectionText: result.connectionText || draft.connectionText || '',
         modelModeration: {
           provider: 'anthropic',
           model: config.anthropicCommentModel,
@@ -1654,6 +1801,82 @@ async function callAnthropicDmModerator({ draft, signal, config, strategyText })
   }
 }
 
+async function callAnthropicDmAgent({ draft, signal, config, strategyText }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.dmModelTimeoutMs);
+  const system = [
+    'Du bist der spezialisierte LinkedIn-DM-Agent fuer Levan Lomidze / MUT-i-GEN.',
+    'Levan entscheidet, dass ein warmes Signal relevant ist. Deine Aufgabe ist, daraus eine ruhige, echte 1:1-Nachricht zu formulieren.',
+    'Schreibe Deutsch, du-Form, ehrlich, direkt, Founder-zu-Founder.',
+    'Keine Emoji, keine Links, kein Calendly, kein Pitch, kein Sales-Druck, kein generisches Lob.',
+    'Die DM soll wie eine echte kurze Nachricht klingen, nicht wie Copywriting.',
+    'Nutze Signal, Profil, Thema und Levans Strategie. Erfinde keine Fakten und keine Beziehung, die nicht genannt wurde.',
+    'Behaupte nicht "bei uns", "wir haben", "ich arbeite mit" oder dass Levan gerade dasselbe Problem hat, ausser es steht explizit im Signal.',
+    'Maximal 500 Zeichen. Ein kurzer Absatz. Hoechstens eine konkrete Rueckfrage am Ende.',
+    'Antworte ausschliesslich als JSON: {"text":"...","reason":"..."}',
+  ].join('\n');
+  const userPayload = {
+    stage: draft.stage,
+    trigger: draft.trigger,
+    profile: draft.profile,
+    postTopic: signal.postTopic || draft.postTopic || '',
+    userPoint: signal.userPoint || draft.userPoint || '',
+    signalText: signal.signalText || draft.signalText || signal.trigger || signal.reactionType || '',
+    fallbackDm: draft.text,
+    mutigenStrategy: compactSnippet(strategyText, 3500),
+  };
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': config.anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: config.anthropicDmModel,
+        max_tokens: config.dmModelMaxTokens,
+        temperature: 0.3,
+        system,
+        messages: [
+          {
+            role: 'user',
+            content: `Formuliere eine LinkedIn-DM aus diesem warmen Signal.\n\n${JSON.stringify(userPayload, null, 2)}`,
+          },
+        ],
+      }),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Anthropic API ${response.status}: ${responseText.slice(0, 300)}`);
+    }
+
+    const data = JSON.parse(responseText);
+    const modelText = (data.content || [])
+      .filter((item) => item.type === 'text' && item.text)
+      .map((item) => item.text)
+      .join('\n');
+    const parsed = parseJsonFromModelText(modelText);
+    const text = sanitizeDraftText(parsed.text || draft.text);
+    const reason = sanitizeDraftText(parsed.reason || 'Claude LinkedIn DM Agent');
+
+    if (!text || looksLikeMetaModerationText(text)) {
+      return { decision: 'rewrite', text: draft.text, reason: `Claude lieferte keine sendbare DM; Fallback verwendet. ${reason}` };
+    }
+
+    if (looksLikeInventedFirstPersonText(text)) {
+      return { decision: 'rewrite', text: draft.text, reason: `Claude erfand eine Ich-/Wir-Erfahrung; Fallback verwendet. ${reason}` };
+    }
+
+    return { decision: 'rewrite', text, reason };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function moderateDmDrafts(dmDrafts, warmSignals, config, strategyText, notes, errors) {
   const summary = {
     provider: config.dmModelProvider,
@@ -1684,7 +1907,9 @@ async function moderateDmDrafts(dmDrafts, warmSignals, config, strategyText, not
     summary.attempted += 1;
 
     try {
-      const result = await callAnthropicDmModerator({ draft, signal, config, strategyText });
+      const result = draft.voiceAgent
+        ? await callAnthropicDmAgent({ draft, signal, config, strategyText })
+        : await callAnthropicDmModerator({ draft, signal, config, strategyText });
       if (result.decision === 'reject' || !result.text) {
         summary.rejected += 1;
         continue;
@@ -1746,7 +1971,11 @@ function makeDmDrafts(warmSignals) {
     stage: signal.stage || 'Stufe 1',
     trigger: signal.trigger || signal.reactionType || 'Warme Reaktion',
     profile: signal.name || signal.profile || '',
-    text: `Danke für deine Reaktion zu ${signal.postTopic || '[Post-Thema]'}. Was du geschrieben hast über ${signal.userPoint || '[ihr Punkt]'} — das kenne ich gut. Wo stehst du gerade damit konkret?`,
+    postTopic: signal.postTopic || '',
+    userPoint: signal.userPoint || '',
+    signalText: signal.signalText || signal.trigger || signal.reactionType || '',
+    voiceAgent: true,
+    text: `Danke für deine Reaktion zu ${signal.postTopic || 'dem Thema'}. Was du geschrieben hast, hat bei mir angedockt. Wo stehst du gerade damit konkret?`,
   }));
 }
 
@@ -2020,10 +2249,23 @@ async function runCopilot(rawConfig = {}) {
   const commentModerationResult = await moderateCommentDrafts(initialCommentDrafts, commentCandidateOpportunities, config, strategyText, notes, errors);
   const commentDrafts = commentModerationResult.drafts.slice(0, 5);
   const finalCommentKeys = new Set(commentDrafts.map((draft) => draft.opportunityKey));
-  const connectionDrafts = opportunities
-    .filter((opportunity) => finalCommentKeys.has(opportunityKey(opportunity)))
+  const connectionDrafts = commentDrafts
+    .filter((draft) => draft.connectionText)
     .slice(0, 2)
-    .map(makeConnectionDraft);
+    .map((draft) => ({
+      opportunityKey: draft.opportunityKey,
+      profile: draft.profile,
+      profileUrl: draft.profileUrl,
+      postIndex: draft.postIndex,
+      text: draft.connectionText,
+      modelModeration: draft.modelModeration || null,
+    }));
+  if (connectionDrafts.length === 0) {
+    connectionDrafts.push(...opportunities
+      .filter((opportunity) => finalCommentKeys.has(opportunityKey(opportunity)))
+      .slice(0, 2)
+      .map(makeConnectionDraft));
+  }
   const initialDmDrafts = makeDmDrafts(config.warmSignals);
   const dmModerationResult = await moderateDmDrafts(initialDmDrafts, config.warmSignals, config, strategyText, notes, errors);
   const dmDrafts = dmModerationResult.drafts.slice(0, 5);

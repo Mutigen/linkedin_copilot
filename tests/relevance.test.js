@@ -1,10 +1,11 @@
 'use strict';
 
 process.env.LINKEDIN_COMMENT_MODEL_PROVIDER = 'none';
+process.env.LINKEDIN_DM_MODEL_PROVIDER = 'none';
 process.env.LINKEDIN_SKIP_OUTPUT_WRITE = 'true';
 
 const assert = require('node:assert/strict');
-const { generateCommentFromBody } = require('../lib/api-runtime');
+const { generateCommentFromBody, generateDmFromBody } = require('../lib/api-runtime');
 
 const personalHashtagPost = `Harry Stebbings
 • Follower:in
@@ -56,19 +57,29 @@ I made that mistake. I won't make it again.`;
 
 async function run() {
   const personalResult = await generateCommentFromBody({ postText: personalHashtagPost });
-  assert.equal(personalResult.ok, false);
-  assert.equal(personalResult.primaryComment, null);
-  assert.equal(personalResult.connectionDrafts.length, 0);
+  assert.equal(personalResult.ok, true);
+  assert.equal(personalResult.primaryComment.topic, 'Claude LinkedIn Voice Agent');
+  assert.match(personalResult.primaryComment.why, /Nutzer hat den Beitrag ausgewählt/);
 
   const investorResult = await generateCommentFromBody({ postText: investorLanguagePost });
   assert.equal(investorResult.ok, true);
-  assert.equal(investorResult.primaryComment.topic, 'Investor-Sprache');
-  assert.match(investorResult.primaryComment.text, /Investorengesprächen|Funding-Gesprächen|Fundraising/);
+  assert.equal(investorResult.primaryComment.topic, 'Claude LinkedIn Voice Agent');
+  assert.match(investorResult.primaryComment.why, /Nutzer hat den Beitrag ausgewählt/);
 
   const founderLearningResult = await generateCommentFromBody({ postText: founderLearningPost });
   assert.equal(founderLearningResult.ok, true);
-  assert.equal(founderLearningResult.primaryComment.topic, 'Founder-Realität');
-  assert.match(founderLearningResult.primaryComment.why, /Founder-Story|Startup/);
+  assert.equal(founderLearningResult.primaryComment.topic, 'Claude LinkedIn Voice Agent');
+  assert.match(founderLearningResult.primaryComment.why, /Nutzer hat den Beitrag ausgewählt/);
+
+  const dmResult = await generateDmFromBody({
+    signalText: 'Spannend, genau damit kämpfen wir auch gerade.',
+    profile: 'Max Mustermann',
+    postTopic: 'Investor-Sprache',
+    userPoint: 'zwei verschiedene Zielgruppen',
+    trigger: 'Kommentar auf meinen Post',
+  });
+  assert.equal(dmResult.ok, true);
+  assert.match(dmResult.primaryDm.text, /Danke|angedockt|konkret/);
 }
 
 run().catch((error) => {
